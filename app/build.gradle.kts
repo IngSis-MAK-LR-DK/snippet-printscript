@@ -8,6 +8,9 @@
 plugins {
     // Apply the application plugin to add support for building a CLI application in Java.
     application
+
+    // Reglas del equipo (spotless, checkstyle, JUnit 5, JaCoCo >= 80%) desde ci-kit.
+    id("edu.austral.ingsis.java-conventions") version "1.0.0"
 }
 
 repositories {
