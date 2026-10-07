@@ -1,12 +1,9 @@
 plugins {
     // Reglas del equipo (spotless, checkstyle, JUnit 5, JaCoCo >= 80%, Java 21) desde ci-kit.
-    id("edu.austral.ingsis.java-conventions") version "1.0.0"
+    id("edu.austral.ingsis.java-conventions") version "1.0.1"
     id("org.springframework.boot") version "3.5.0"
     id("io.spring.dependency-management") version "1.1.7"
 }
-
-// TODO: borrar cuando se publique ci-kit 1.0.1 (alinea JUnit con Spring Boot).
-extra["junit-jupiter.version"] = "5.10.3"
 
 repositories {
     mavenCentral()
