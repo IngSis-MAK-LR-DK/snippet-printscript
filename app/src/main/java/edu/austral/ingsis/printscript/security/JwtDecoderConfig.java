@@ -26,13 +26,15 @@ public class JwtDecoderConfig {
         return new SupplierJwtDecoder(() -> buildDecoder(audience, issuer));
     }
 
+    /** Reglas que debe cumplir un token: emisor, vigencia y destinatario (audience). */
+    static OAuth2TokenValidator<Jwt> tokenValidator(String audience, String issuer) {
+        return new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(issuer), new AudienceValidator(audience));
+    }
+
     private static JwtDecoder buildDecoder(String audience, String issuer) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuer).build();
-        OAuth2TokenValidator<Jwt> validator =
-                new DelegatingOAuth2TokenValidator<>(
-                        JwtValidators.createDefaultWithIssuer(issuer),
-                        new AudienceValidator(audience));
-        decoder.setJwtValidator(validator);
+        decoder.setJwtValidator(tokenValidator(audience, issuer));
         return decoder;
     }
 }
