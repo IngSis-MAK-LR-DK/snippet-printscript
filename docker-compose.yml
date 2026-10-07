@@ -1,0 +1,18 @@
+services:
+  snippet-printscript:
+    build:
+      context: .
+      secrets:
+        - gpr_user
+        - gpr_key
+    environment:
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+      AUTH_SERVER_URI: ${AUTH_SERVER_URI}
+    ports:
+      - "${SERVICE_PORT}:8080"
+
+secrets:
+  gpr_user:
+    environment: GPR_USER
+  gpr_key:
+    environment: GPR_KEY
