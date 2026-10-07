@@ -1,0 +1,9 @@
+# Valores para los tests: no hay variables de entorno ni acceso a Auth0.
+auth0:
+  audience: test-audience
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://issuer.invalid/

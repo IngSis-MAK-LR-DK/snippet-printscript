@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: snippet-printscript
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Quien emite los tokens: URL completa del tenant de Auth0, CON la barra final.
+          issuer-uri: ${AUTH_SERVER_URI}
+
+auth0:
+  # "Identifier" de la API creada en Auth0. Es uno solo para toda la plataforma.
+  audience: ${AUTH0_AUDIENCE}
