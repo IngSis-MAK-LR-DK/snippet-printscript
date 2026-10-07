@@ -9,3 +9,6 @@ build
 
 # IntelliJ output
 out
+
+# Variables de entorno locales (usar .env.example como plantilla)
+.env
