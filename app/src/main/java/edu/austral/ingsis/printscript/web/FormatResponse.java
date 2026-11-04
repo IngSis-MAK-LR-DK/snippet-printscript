@@ -1,3 +1,3 @@
 package edu.austral.ingsis.printscript.web;
 
-public record FormatResponse(String formatted) {}
+public record FormatResponse(String content) {}

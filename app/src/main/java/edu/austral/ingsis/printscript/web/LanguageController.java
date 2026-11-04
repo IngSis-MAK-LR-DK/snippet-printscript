@@ -1,6 +1,8 @@
 package edu.austral.ingsis.printscript.web;
 
+import edu.austral.ingsis.printscript.language.ExecutionResult;
 import edu.austral.ingsis.printscript.language.LanguageService;
+import edu.austral.ingsis.printscript.language.RuleSetting;
 import edu.austral.ingsis.printscript.language.ValidationResult;
 
 import jakarta.validation.Valid;
@@ -20,33 +22,37 @@ public class LanguageController {
         this.service = service;
     }
 
-    /** Siempre 200: un codigo invalido es una respuesta normal ("valid": false y el error). */
+    /** Siempre 200: un codigo invalido es una respuesta normal ("valid": false y los errores). */
     @PostMapping("/validate")
     public ValidationResult validate(@Valid @RequestBody ValidateRequest request) {
-        return service.validate(request.code(), Versions.parse(request.version()));
+        return service.validate(request.content(), Versions.parse(request.version()));
     }
 
-    @PostMapping("/analyze")
-    public AnalyzeResponse analyze(@Valid @RequestBody AnalyzeRequest request) {
-        return new AnalyzeResponse(
-                service.analyze(
-                        request.code(), Versions.parse(request.version()), request.config()));
+    @PostMapping("/lint")
+    public LintResponse lint(@Valid @RequestBody LintRequest request) {
+        return new LintResponse(
+                service.lint(
+                        request.content(),
+                        Versions.parse(request.version()),
+                        RuleSetting.toLintOptions(request.rules())));
     }
 
     @PostMapping("/format")
     public FormatResponse format(@Valid @RequestBody FormatRequest request) {
         return new FormatResponse(
                 service.format(
-                        request.code(), Versions.parse(request.version()), request.config()));
+                        request.content(),
+                        Versions.parse(request.version()),
+                        RuleSetting.toFormatOptions(request.rules())));
     }
 
+    /** Siempre 200: los errores de ejecucion van en "errors", como pide el contrato. */
     @PostMapping("/execute")
-    public ExecuteResponse execute(@Valid @RequestBody ExecuteRequest request) {
-        return new ExecuteResponse(
-                service.execute(
-                        request.code(),
-                        Versions.parse(request.version()),
-                        request.inputs(),
-                        request.env()));
+    public ExecutionResult execute(@Valid @RequestBody ExecuteRequest request) {
+        return service.execute(
+                request.content(),
+                Versions.parse(request.version()),
+                request.inputs(),
+                request.env());
     }
 }

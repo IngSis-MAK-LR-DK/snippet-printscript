@@ -2,7 +2,6 @@ package edu.austral.ingsis.printscript.language;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -11,7 +10,6 @@ import java.util.Map;
 
 import edu.austral.ingsis.printscript.analyzer.IdentifierCase;
 import edu.austral.ingsis.printscript.common.PrintScriptException;
-import edu.austral.ingsis.printscript.common.SemanticException;
 import edu.austral.ingsis.printscript.common.Version;
 
 import org.junit.jupiter.api.Test;
@@ -29,7 +27,7 @@ class LanguageServiceTest {
         ValidationResult result = service.validate("let x: number = 5;\nprintln(x);", V11);
 
         assertTrue(result.valid());
-        assertEquals(null, result.error());
+        assertTrue(result.errors().isEmpty());
     }
 
     @Test
@@ -37,17 +35,18 @@ class LanguageServiceTest {
         ValidationResult result = service.validate("let x: number = ;", V11);
 
         assertFalse(result.valid());
-        assertNotNull(result.error());
-        assertEquals(1, result.error().start().line());
-        assertTrue(result.error().start().column() >= 1);
+        assertEquals(1, result.errors().size());
+        Violation error = result.errors().get(0);
+        assertEquals(1, error.line());
+        assertTrue(error.column() >= 1);
     }
 
     @Test
-    void semanticErrorIsReported() {
+    void semanticErrorIsReportedWithItsType() {
         ValidationResult result = service.validate("println(undeclared);", V11);
 
         assertFalse(result.valid());
-        assertEquals("SemanticException", result.error().type());
+        assertEquals("SemanticException", result.errors().get(0).rule());
     }
 
     @Test
@@ -57,33 +56,34 @@ class LanguageServiceTest {
         assertFalse(result.valid());
     }
 
-    // --- analyze ----------------------------------------------------------------------------
+    // --- lint -------------------------------------------------------------------------------
 
     @Test
-    void analyzeReportsIdentifierCaseViolations() {
-        List<Finding> findings = service.analyze("let my_var: number = 1;", V11, null);
+    void lintReportsIdentifierCaseViolationsWithTheRuleName() {
+        List<Violation> violations = service.lint("let my_var: number = 1;", V11, null);
 
-        assertFalse(findings.isEmpty());
-        assertEquals(1, findings.get(0).start().line());
+        assertFalse(violations.isEmpty());
+        assertEquals(RuleCatalog.IDENTIFIER_CASE, violations.get(0).rule());
+        assertEquals(1, violations.get(0).line());
     }
 
     @Test
-    void analyzeWithSnakeCaseAcceptsSnakeCaseIdentifiers() {
+    void lintWithSnakeCaseAcceptsSnakeCaseIdentifiers() {
         LintOptions snake = new LintOptions(true, IdentifierCase.SNAKE_CASE, null, null);
 
-        assertTrue(service.analyze("let my_var: number = 1;", V11, snake).isEmpty());
+        assertTrue(service.lint("let my_var: number = 1;", V11, snake).isEmpty());
     }
 
     @Test
-    void analyzeWithRuleDisabledReportsNothing() {
-        LintOptions off = new LintOptions(false, null, null, null);
+    void lintWithRuleDisabledReportsNothing() {
+        LintOptions off = new LintOptions(false, null, false, false);
 
-        assertTrue(service.analyze("let my_var: number = 1;", V11, off).isEmpty());
+        assertTrue(service.lint("let my_var: number = 1;", V11, off).isEmpty());
     }
 
     @Test
-    void analyzeOfInvalidCodeThrows() {
-        assertThrows(PrintScriptException.class, () -> service.analyze("let = ;", V11, null));
+    void lintOfInvalidCodeThrows() {
+        assertThrows(PrintScriptException.class, () -> service.lint("let = ;", V11, null));
     }
 
     // --- format -----------------------------------------------------------------------------
@@ -116,10 +116,11 @@ class LanguageServiceTest {
 
     @Test
     void executeCollectsPrintlnOutputs() {
-        List<String> outputs =
+        ExecutionResult result =
                 service.execute("println(\"hola\");\nprintln(1 + 2);", V11, null, null);
 
-        assertEquals(List.of("hola", "3"), outputs);
+        assertEquals(List.of("hola", "3"), result.outputs());
+        assertTrue(result.errors().isEmpty());
     }
 
     @Test
@@ -129,37 +130,39 @@ class LanguageServiceTest {
                         + "let b: string = readInput(\"b\");\n"
                         + "println(b);\nprintln(a);";
 
-        List<String> outputs = service.execute(code, V11, List.of("uno", "dos"), null);
+        ExecutionResult result = service.execute(code, V11, List.of("uno", "dos"), null);
 
-        assertEquals(List.of("dos", "uno"), outputs);
+        assertEquals(List.of("dos", "uno"), result.outputs());
     }
 
     @Test
-    void executeFailsWithPositionWhenInputsRunOut() {
-        String code = "let a: string = readInput(\"nombre\");\nprintln(a);";
+    void executeReportsMissingInputAndKeepsThePartialOutput() {
+        String code =
+                "println(\"antes\");\n"
+                        + "let a: string = readInput(\"nombre\");\n"
+                        + "println(a);";
 
-        SemanticException error =
-                assertThrows(
-                        SemanticException.class, () -> service.execute(code, V11, List.of(), null));
+        ExecutionResult result = service.execute(code, V11, List.of(), null);
 
-        // La libreria envuelve el error del proveedor de inputs y le agrega la posicion del
-        // readInput.
-        assertTrue(error.getMessage().contains("no se enviaron mas inputs"));
-        assertEquals(1, error.start().line());
+        assertEquals(List.of("antes"), result.outputs());
+        assertEquals(1, result.errors().size());
+        assertTrue(result.errors().get(0).contains("no se enviaron mas inputs"));
     }
 
     @Test
     void executeReadsOnlyTheEnvironmentSentByTheClient() {
         String code = "let a: string = readEnv(\"NOMBRE\");\nprintln(a);";
 
-        List<String> outputs = service.execute(code, V11, null, Map.of("NOMBRE", "Ana"));
+        ExecutionResult result = service.execute(code, V11, null, Map.of("NOMBRE", "Ana"));
 
-        assertEquals(List.of("Ana"), outputs);
+        assertEquals(List.of("Ana"), result.outputs());
     }
 
     @Test
-    void executeOfInvalidCodeThrows() {
-        assertThrows(
-                PrintScriptException.class, () -> service.execute("println(;", V11, null, null));
+    void executeOfInvalidCodeReportsTheErrorInsteadOfThrowing() {
+        ExecutionResult result = service.execute("println(;", V11, null, null);
+
+        assertTrue(result.outputs().isEmpty());
+        assertEquals(1, result.errors().size());
     }
 }
