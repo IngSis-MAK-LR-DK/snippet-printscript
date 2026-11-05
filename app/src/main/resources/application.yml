@@ -1,13 +1,17 @@
 spring:
+  config:
+    # Carga AUTH0_* desde el .env de la raiz del repo, si existe (ver .env.example).
+    # Las variables de entorno con el mismo nombre ganan sobre el archivo.
+    import: optional:file:.env[.properties]
   application:
     name: snippet-printscript
   security:
     oauth2:
       resourceserver:
         jwt:
-          # Quien emite los tokens: URL completa del tenant de Auth0, CON la barra final.
-          issuer-uri: ${AUTH_SERVER_URI}
-
-auth0:
-  # "Identifier" de la API creada en Auth0. Es uno solo para toda la plataforma.
-  audience: ${AUTH0_AUDIENCE}
+          # El "iss" de Auth0 es "https://<tenant>/" (con esquema y barra final). Spring lo compara
+          # como string exacto, asi que el formato tiene que coincidir.
+          issuer-uri: https://${AUTH0_DOMAIN}/
+          # Rechaza los tokens que no fueron emitidos para esta API (claim "aud"). Es UNA SOLA
+          # API para toda la plataforma: todos los servicios validan la misma.
+          audiences: ${AUTH0_AUDIENCE}
