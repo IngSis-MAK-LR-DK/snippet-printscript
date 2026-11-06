@@ -1,6 +1,7 @@
 package edu.austral.ingsis.printscript.web;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import edu.austral.ingsis.printscript.language.LanguageService;
 import edu.austral.ingsis.printscript.security.SecurityConfig;
 
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,7 +23,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /** Prueba el contrato HTTP completo, con el LanguageService y la libreria PrintScript reales. */
 @WebMvcTest(LanguageController.class)
-@Import({SecurityConfig.class, LanguageService.class})
+@Import({SecurityConfig.class, LanguageService.class, RuleController.class})
 class LanguageControllerTest {
 
     private static final String VALID_CODE = "let x: number = 5;\\nprintln(x);";
@@ -34,48 +36,48 @@ class LanguageControllerTest {
 
     @Test
     void validateAcceptsValidCode() throws Exception {
-        call("/validate", "{\"code\":\"" + VALID_CODE + "\",\"version\":\"1.1\"}")
+        call("/validate", "{\"content\":\"" + VALID_CODE + "\",\"version\":\"1.1\"}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.valid").value(true))
-                .andExpect(jsonPath("$.error").doesNotExist());
+                .andExpect(jsonPath("$.errors").isEmpty());
     }
 
     @Test
-    void validateReportsInvalidCodeWithPositionAndStatus200() throws Exception {
-        call("/validate", "{\"code\":\"let x: number = ;\"}")
+    void validateReportsInvalidCodeAsErrorsWithPosition() throws Exception {
+        call("/validate", "{\"content\":\"let x: number = ;\"}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.valid").value(false))
-                .andExpect(jsonPath("$.error.type").exists())
-                .andExpect(jsonPath("$.error.message").exists())
-                .andExpect(jsonPath("$.error.start.line").value(1))
-                .andExpect(jsonPath("$.error.start.column").isNumber());
+                .andExpect(jsonPath("$.errors[0].rule").exists())
+                .andExpect(jsonPath("$.errors[0].message").exists())
+                .andExpect(jsonPath("$.errors[0].line").value(1))
+                .andExpect(jsonPath("$.errors[0].column").isNumber());
     }
 
     @Test
     void versionDefaultsToTheLatest() throws Exception {
-        call("/validate", "{\"code\":\"const x: number = 1;\"}")
+        call("/validate", "{\"content\":\"const x: number = 1;\"}")
                 .andExpect(jsonPath("$.valid").value(true));
-        call("/validate", "{\"code\":\"const x: number = 1;\",\"version\":\"1.0\"}")
+        call("/validate", "{\"content\":\"const x: number = 1;\",\"version\":\"1.0\"}")
                 .andExpect(jsonPath("$.valid").value(false));
     }
 
     @Test
     void unknownVersionIsBadRequest() throws Exception {
-        call("/validate", "{\"code\":\"println(1);\",\"version\":\"9.9\"}")
+        call("/validate", "{\"content\":\"println(1);\",\"version\":\"9.9\"}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
-    void missingCodeIsBadRequest() throws Exception {
+    void missingContentIsBadRequest() throws Exception {
         call("/validate", "{\"version\":\"1.1\"}").andExpect(status().isBadRequest());
     }
 
     @Test
-    void tooLargeCodeIsBadRequest() throws Exception {
+    void tooLargeContentIsBadRequest() throws Exception {
         String huge = "a".repeat(LanguageController.MAX_CODE_LENGTH + 1);
 
-        call("/validate", "{\"code\":\"" + huge + "\"}").andExpect(status().isBadRequest());
+        call("/validate", "{\"content\":\"" + huge + "\"}").andExpect(status().isBadRequest());
     }
 
     @Test
@@ -83,29 +85,41 @@ class LanguageControllerTest {
         call("/validate", "{no es json").andExpect(status().isBadRequest());
     }
 
-    // --- /analyze ---------------------------------------------------------------------------
+    // --- /lint ------------------------------------------------------------------------------
 
     @Test
-    void analyzeReturnsFindingsWithPosition() throws Exception {
-        call("/analyze", "{\"code\":\"let my_var: number = 1;\"}")
+    void lintReturnsViolationsWithRuleAndPosition() throws Exception {
+        call("/lint", "{\"content\":\"let my_var: number = 1;\"}")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.findings[0].message").exists())
-                .andExpect(jsonPath("$.findings[0].start.line").value(1));
+                .andExpect(jsonPath("$.violations[0].rule").value("identifier-case"))
+                .andExpect(jsonPath("$.violations[0].message").exists())
+                .andExpect(jsonPath("$.violations[0].line").value(1));
     }
 
     @Test
-    void analyzeUsesTheGivenRules() throws Exception {
+    void lintUsesTheRulesSentByTheClient() throws Exception {
         call(
-                        "/analyze",
-                        "{\"code\":\"let my_var: number = 1;\","
-                                + "\"config\":{\"identifierCase\":\"SNAKE_CASE\"}}")
+                        "/lint",
+                        "{\"content\":\"let my_var: number = 1;\","
+                                + "\"rules\":[{\"name\":\"identifier-case\","
+                                + "\"enabled\":true,\"value\":\"SNAKE_CASE\"}]}")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.findings").isEmpty());
+                .andExpect(jsonPath("$.violations").isEmpty());
     }
 
     @Test
-    void analyzeOfInvalidCodeIs422() throws Exception {
-        call("/analyze", "{\"code\":\"let = ;\"}")
+    void lintWithUnknownIdentifierCaseIsBadRequest() throws Exception {
+        call(
+                        "/lint",
+                        "{\"content\":\"let x: number = 1;\","
+                                + "\"rules\":[{\"name\":\"identifier-case\","
+                                + "\"enabled\":true,\"value\":\"KEBAB\"}]}")
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void lintOfInvalidCodeIs422() throws Exception {
+        call("/lint", "{\"content\":\"let = ;\"}")
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").exists())
                 .andExpect(jsonPath("$.error.start.line").value(1));
@@ -114,39 +128,46 @@ class LanguageControllerTest {
     // --- /format ----------------------------------------------------------------------------
 
     @Test
-    void formatReturnsFormattedCode() throws Exception {
-        call("/format", "{\"code\":\"let   x:number=5;\"}")
+    void formatReturnsFormattedContent() throws Exception {
+        call("/format", "{\"content\":\"let   x:number=5;\"}")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.formatted").value("let x: number = 5;\n"));
+                .andExpect(jsonPath("$.content").value("let x: number = 5;\n"));
     }
 
     @Test
-    void formatUsesTheGivenRules() throws Exception {
+    void formatUsesTheRulesSentByTheClient() throws Exception {
         call(
                         "/format",
-                        "{\"code\":\"let x: number = 5;\",\"config\":{\"spaceAroundEquals\":false}}")
-                .andExpect(jsonPath("$.formatted").value("let x: number=5;\n"));
+                        "{\"content\":\"let x: number = 5;\","
+                                + "\"rules\":[{\"name\":\"space-around-equals\","
+                                + "\"enabled\":false,\"value\":null}]}")
+                .andExpect(jsonPath("$.content").value("let x: number=5;\n"));
     }
 
     @Test
-    void formatWithInvalidRuleIsBadRequest() throws Exception {
-        call("/format", "{\"code\":\"println(1);\",\"config\":{\"newLinesBeforePrintln\":9}}")
+    void formatWithInvalidRuleValueIsBadRequest() throws Exception {
+        call(
+                        "/format",
+                        "{\"content\":\"println(1);\","
+                                + "\"rules\":[{\"name\":\"new-lines-before-println\","
+                                + "\"enabled\":true,\"value\":\"9\"}]}")
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void formatOfInvalidCodeIs422() throws Exception {
-        call("/format", "{\"code\":\"println(;\"}").andExpect(status().isUnprocessableEntity());
+        call("/format", "{\"content\":\"println(;\"}").andExpect(status().isUnprocessableEntity());
     }
 
     // --- /execute ---------------------------------------------------------------------------
 
     @Test
-    void executeReturnsOutputs() throws Exception {
-        call("/execute", "{\"code\":\"println(\\\"hola\\\");\\nprintln(1 + 2);\"}")
+    void executeReturnsOutputsAndNoErrors() throws Exception {
+        call("/execute", "{\"content\":\"println(\\\"hola\\\");\\nprintln(1 + 2);\"}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.outputs[0]").value("hola"))
-                .andExpect(jsonPath("$.outputs[1]").value("3"));
+                .andExpect(jsonPath("$.outputs[1]").value("3"))
+                .andExpect(jsonPath("$.errors").isEmpty());
     }
 
     @Test
@@ -158,7 +179,7 @@ class LanguageControllerTest {
 
         call(
                         "/execute",
-                        "{\"code\":\""
+                        "{\"content\":\""
                                 + code
                                 + "\",\"inputs\":[\"uno\"],\"env\":{\"NOMBRE\":\"Ana\"}}")
                 .andExpect(status().isOk())
@@ -167,13 +188,37 @@ class LanguageControllerTest {
     }
 
     @Test
-    void executeWithoutEnoughInputsIs422WithPosition() throws Exception {
-        call("/execute", "{\"code\":\"let a: string = readInput(\\\"nombre\\\");\"}")
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.error.start.line").value(1))
-                .andExpect(
-                        jsonPath("$.message")
-                                .value(org.hamcrest.Matchers.containsString("inputs")));
+    void executeWithoutEnoughInputsReportsTheErrorWith200() throws Exception {
+        call("/execute", "{\"content\":\"let a: string = readInput(\\\"nombre\\\");\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outputs").isEmpty())
+                .andExpect(jsonPath("$.errors[0]").value(Matchers.containsString("inputs")));
+    }
+
+    // --- /rules -----------------------------------------------------------------------------
+
+    @Test
+    void lintRulesAreListedWithTheirDefaults() throws Exception {
+        mockMvc.perform(get("/rules").param("type", "LINT").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("identifier-case"))
+                .andExpect(jsonPath("$[0].enabledByDefault").value(true))
+                .andExpect(jsonPath("$[0].defaultValue").value("CAMEL_CASE"));
+    }
+
+    @Test
+    void formatRulesAreListedWithTheirDefaults() throws Exception {
+        mockMvc.perform(get("/rules").param("type", "FORMAT").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("space-before-colon"))
+                .andExpect(jsonPath("$[0].enabledByDefault").value(false))
+                .andExpect(jsonPath("$[3].defaultValue").value("0"));
+    }
+
+    @Test
+    void unknownRuleTypeIsBadRequest() throws Exception {
+        mockMvc.perform(get("/rules").param("type", "OTRO").with(asUser()))
+                .andExpect(status().isBadRequest());
     }
 
     // --- seguridad --------------------------------------------------------------------------
@@ -183,7 +228,7 @@ class LanguageControllerTest {
         mockMvc.perform(
                         post("/validate")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"code\":\"println(1);\"}"))
+                                .content("{\"content\":\"println(1);\"}"))
                 .andExpect(status().isUnauthorized());
     }
 

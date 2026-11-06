@@ -1,9 +1,4 @@
 # Valores para los tests: no hay variables de entorno ni acceso a Auth0.
-auth0:
-  audience: test-audience
-spring:
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: https://issuer.invalid/
+# Los tests reemplazan el JwtDecoder con un mock, asi que nunca se contacta a este dominio.
+AUTH0_DOMAIN: test.invalid
+AUTH0_AUDIENCE: https://test-api

@@ -6,8 +6,8 @@ services:
         - gpr_user
         - gpr_key
     environment:
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN}
       AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
-      AUTH_SERVER_URI: ${AUTH_SERVER_URI}
     ports:
       - "${SERVICE_PORT}:8080"
 

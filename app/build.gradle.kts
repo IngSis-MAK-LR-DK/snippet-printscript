@@ -56,3 +56,8 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
         files(classDirectories.files.map { fileTree(it) { exclude(jacocoExcludes) } }),
     )
 }
+
+// bootRun corre desde la raiz del repo, donde esta el .env que lee spring.config.import.
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    workingDir = rootProject.projectDir
+}

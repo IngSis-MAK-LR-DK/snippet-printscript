@@ -11,7 +11,7 @@ import jakarta.validation.constraints.Size;
  * de entorno del servidor.
  */
 public record ExecuteRequest(
-        @NotNull @Size(max = LanguageController.MAX_CODE_LENGTH) String code,
+        @NotNull @Size(max = LanguageController.MAX_CODE_LENGTH) String content,
         String version,
         List<String> inputs,
         Map<String, String> env) {}
