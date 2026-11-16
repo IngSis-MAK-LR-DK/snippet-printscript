@@ -1,4 +1,4 @@
-package edu.austral.ingsis.printscript.stream;
+package edu.austral.ingsis.printscript.execution;
 
 import java.io.IOException;
 import java.time.Duration;

@@ -17,12 +17,12 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    /** /health es publico; todo lo demas exige un JWT valido. */
+    /** /health y /version son publicos; todo lo demas exige un JWT valido. */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(
                         auth ->
-                                auth.requestMatchers("/health")
+                                auth.requestMatchers("/health", "/version")
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())

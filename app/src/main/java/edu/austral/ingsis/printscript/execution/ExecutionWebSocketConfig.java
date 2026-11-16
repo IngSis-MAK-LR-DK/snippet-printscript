@@ -1,4 +1,4 @@
-package edu.austral.ingsis.printscript.stream;
+package edu.austral.ingsis.printscript.execution;
 
 import java.time.Duration;
 import java.util.concurrent.Executors;
@@ -19,14 +19,14 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
  */
 @Configuration
 @EnableWebSocket
-public class WebSocketConfig implements WebSocketConfigurer {
+public class ExecutionWebSocketConfig implements WebSocketConfigurer {
 
     /** Mismo tope de codigo que los endpoints HTTP. */
     private static final int MAX_CODE_LENGTH = 200_000;
 
     private final ExecutionSocketHandler handler;
 
-    public WebSocketConfig(
+    public ExecutionWebSocketConfig(
             LanguageService language,
             ObjectMapper json,
             @Value("${execution.input-timeout:5m}") Duration inputTimeout) {
