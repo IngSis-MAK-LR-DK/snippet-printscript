@@ -13,26 +13,36 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Pone en el contexto de logging quien hace el request, asi cada linea que se loguea mientras se
- * atiende lo lleva sin que nadie lo escriba. Corre despues de validar el token. Solo va el {@code
- * sub} del token: nunca el token ni el email.
+ * Agrega al contexto de logs quien hace el pedido: el {@code sub} del JWT (por ejemplo {@code
+ * auth0|abc123}). Es un identificador, no un dato personal: nunca se loguea el mail ni el token.
+ *
+ * <p>Se registra en la cadena de Spring Security, justo despues de la autenticacion: antes de eso
+ * todavia no se sabe quien es.
  */
-public class UserContextFilter extends OncePerRequestFilter {
+public class UserMdcFilter extends OncePerRequestFilter {
 
-    public static final String USER = "user";
+    public static final String MDC_KEY = "userId";
 
     @Override
     protected void doFilterInternal(
             HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication instanceof JwtAuthenticationToken jwt) {
-            MDC.put(USER, jwt.getToken().getSubject());
+        String userId = currentUserId();
+        if (userId != null) {
+            MDC.put(MDC_KEY, userId);
         }
         try {
             chain.doFilter(request, response);
         } finally {
-            MDC.remove(USER);
+            MDC.remove(MDC_KEY);
         }
+    }
+
+    private static String currentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication instanceof JwtAuthenticationToken token) {
+            return token.getToken().getSubject();
+        }
+        return null;
     }
 }
