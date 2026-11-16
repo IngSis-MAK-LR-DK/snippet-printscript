@@ -17,7 +17,7 @@ repositories {
     }
 }
 
-val printscriptVersion = "1.1.1"
+val printscriptVersion = "1.1.2"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
