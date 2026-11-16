@@ -1,5 +1,7 @@
 package edu.austral.ingsis.printscript.security;
 
+import edu.austral.ingsis.printscript.observability.UserMdcFilter;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -7,6 +9,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
@@ -27,6 +30,8 @@ public class SecurityConfig {
                                         .anyRequest()
                                         .authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
+                // Con el token ya validado, el usuario queda en el contexto de logging (MDC).
+                .addFilterAfter(new UserMdcFilter(), BearerTokenAuthenticationFilter.class)
                 // El bearer token hace a la API stateless: sin sesion HTTP ni cookie de sesion.
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
