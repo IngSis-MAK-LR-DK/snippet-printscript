@@ -35,6 +35,16 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
 }
 
+// GET /version informa la version del motor PrintScript (META-INF/build-info.properties). El handler
+// revalida todos los snippets cuando cambia, es decir, al desplegar un adaptador con un motor nuevo.
+springBoot {
+    buildInfo {
+        properties {
+            additional.set(mapOf("printscript" to printscriptVersion))
+        }
+    }
+}
+
 // Un unico jar ejecutable con nombre fijo (lo usa el Dockerfile); sin el "-plain.jar".
 tasks.named<Jar>("jar") {
     enabled = false
