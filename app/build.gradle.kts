@@ -17,10 +17,12 @@ repositories {
     }
 }
 
-val printscriptVersion = "1.1.1"
+val printscriptVersion = "1.1.2"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
+    // Ejecucion en streaming (US 9 y 10): WebSocket de Spring, sobre el mismo Tomcat.
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
 
