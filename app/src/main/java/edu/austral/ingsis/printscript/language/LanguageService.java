@@ -18,8 +18,10 @@ import edu.austral.ingsis.printscript.common.Version;
 import edu.austral.ingsis.printscript.common.ast.Statement;
 import edu.austral.ingsis.printscript.formatter.Formatter;
 import edu.austral.ingsis.printscript.formatter.PrintScriptFormatter;
+import edu.austral.ingsis.printscript.interpreter.Emitter;
 import edu.austral.ingsis.printscript.interpreter.EnvironmentReader;
 import edu.austral.ingsis.printscript.interpreter.ExecutionContext;
+import edu.austral.ingsis.printscript.interpreter.InputProvider;
 import edu.austral.ingsis.printscript.interpreter.Interpreter;
 import edu.austral.ingsis.printscript.interpreter.PrintScriptInterpreter;
 import edu.austral.ingsis.printscript.interpreter.PrintScriptSemanticAnalyzer;
@@ -91,13 +93,11 @@ public class LanguageService {
     public ExecutionResult execute(
             String code, Version version, List<String> inputs, Map<String, String> env) {
         Iterator<String> remainingInputs = (inputs != null ? inputs : List.<String>of()).iterator();
-        Map<String, String> variables = env != null ? env : Collections.emptyMap();
         List<String> outputs = new ArrayList<>();
-        List<String> errors = new ArrayList<>();
-
-        EnvironmentReader environment = name -> Optional.ofNullable(variables.get(name));
-        ExecutionContext context =
-                new ExecutionContext(
+        List<String> errors =
+                run(
+                        code,
+                        version,
                         outputs::add,
                         prompt -> {
                             if (!remainingInputs.hasNext()) {
@@ -105,14 +105,31 @@ public class LanguageService {
                             }
                             return remainingInputs.next();
                         },
-                        environment);
-
-        try {
-            interpreter.interpret(parse(code, version), context);
-        } catch (PrintScriptException e) {
-            errors.add(e.getMessage());
-        }
+                        env);
         return new ExecutionResult(outputs, errors);
+    }
+
+    /**
+     * Ejecuta el programa avisando cada println a {@code output} apenas se ejecuta y pidiendo cada
+     * readInput a {@code input} recien cuando el programa lo necesita: el parser va sentencia por
+     * sentencia, asi que la salida sale mientras el programa corre. Devuelve los errores (vacio si
+     * termino bien); la salida anterior al error ya se aviso.
+     */
+    public List<String> run(
+            String code,
+            Version version,
+            Emitter output,
+            InputProvider input,
+            Map<String, String> env) {
+        Map<String, String> variables = env != null ? env : Collections.emptyMap();
+        EnvironmentReader environment = name -> Optional.ofNullable(variables.get(name));
+        try {
+            interpreter.interpret(
+                    parse(code, version), new ExecutionContext(output, input, environment));
+            return List.of();
+        } catch (PrintScriptException e) {
+            return List.of(e.getMessage());
+        }
     }
 
     /** Un analizador por regla: cada uno tiene activa solo esa regla. */
